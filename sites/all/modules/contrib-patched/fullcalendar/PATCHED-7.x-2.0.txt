@@ -1,0 +1,88 @@
+diff --git a/includes/views/fullcalendar.views.inc b/includes/views/fullcalendar.views.inc
+index dbaee00..a60b641 100644
+--- a/includes/views/fullcalendar.views.inc
++++ b/includes/views/fullcalendar.views.inc
+@@ -114,8 +114,8 @@ function fullcalendar_views_pre_view(&$view, &$display_id, &$args) {
+       $max = date('Y-m', strtotime($min . ' +1 month'));
+     }
+     else {
+-      $min = $settings['date']['year'] . '-' . ($settings['date']['month'] + 1);
+-      $max = $settings['date']['year'] . '-' . ($settings['date']['month'] + 2);
++      $min = date('Y-m', mktime(0, 0, 0, $settings['date']['month'] + 1, 1, $settings['date']['year']));
++      $max = date('Y-m', mktime(0, 0, 0, $settings['date']['month'] + 2, 1, $settings['date']['year']));
+     }
+     $min = date('Y-m-d', strtotime($min . ' -2 weeks'));
+     $max = date('Y-m-d', strtotime($max . ' +2 weeks'));
+
+================================================================================
+diff --git a/includes/views/fullcalendar.views.inc b/includes/views/fullcalendar.views.inc
+index a60b641..c0641b9 100644
+--- a/includes/views/fullcalendar.views.inc
++++ b/includes/views/fullcalendar.views.inc
+@@ -121,7 +121,7 @@ function fullcalendar_views_pre_view(&$view, &$display_id, &$args) {
+     $max = date('Y-m-d', strtotime($max . ' +2 weeks'));
+     $options = array(
+       'exposed' => TRUE,
+-      'form_type' => 'date_text',
++      'form_type' => 'date_select',
+       'operator' => 'between',
+       'default_date' => $min,
+       'default_to_date' => $max,
+diff --git a/js/fullcalendar.ajax.js b/js/fullcalendar.ajax.js
+index eb584fa..6c7d090 100644
+--- a/js/fullcalendar.ajax.js
++++ b/js/fullcalendar.ajax.js
+@@ -9,12 +9,20 @@ Drupal.fullcalendar.fullcalendar.prototype.dateChange = function (fields) {
+   }
+ 
+   if (view.name == 'month') {
+-    var min = $.fullCalendar.formatDate(view.visStart, 'yyyy-MM-dd');
+-    var max = $.fullCalendar.formatDate(view.visEnd, 'yyyy-MM-dd');
++    // Update the select values for the start and end dates. First we format the dates
++    // into values we can use to directly change the selects.
++    var date_parts = {
++      min: $.fullCalendar.formatDate(view.visStart, 'yyyy-M-d').split('-'),
++      max: $.fullCalendar.formatDate(view.visEnd, 'yyyy-M-d').split('-')
++    };
++    $cal = this.$calendar;
+     for (var i in fields) {
+-      this.$calendar.find('.views-widget-filter-' + i).hide();
+-      this.$calendar.find('#edit-' + fields[i] + '-min-date').attr('value', min);
+-      this.$calendar.find('#edit-' + fields[i] + '-max-date').attr('value', max);
++      $cal.find('.views-widget-filter-' + i).hide(); 
++      $.each(['min','max'], function (_, type) {
++        $cal.find('#edit-' + fields[i] + '-' + type + '-year').attr('value', date_parts[type][0]);
++        $cal.find('#edit-' + fields[i] + '-' + type + '-month').attr('value', date_parts[type][1]);
++        $cal.find('#edit-' + fields[i] + '-' + type + '-day').attr('value', date_parts[type][2]);
++      });
+     }
+   }
+   if (name) {
+   
+================================================================================
+diff --git a/sites/all/modules/contrib-patched/fullcalendar/includes/views/fullcalendar.view
+index e2f0aec..980621a 100644
+--- a/sites/all/modules/contrib-patched/fullcalendar/includes/views/fullcalendar.views.inc
++++ b/sites/all/modules/contrib-patched/fullcalendar/includes/views/fullcalendar.views.inc
+@@ -109,7 +109,19 @@ function fullcalendar_views_pre_view(&$view, &$display_id, &$args) {
+     // Add an exposed filter for the date field.
+     $field_value_id = $field->real_field . str_replace($field->field, '', $field_id);
+     if (isset($exposed_input[$field_value_id])) {
+-      $timestamp = (strtotime($exposed_input[$field_value_id]['min']['date']) + strtotime($
++      /*
++       the following line is commented out
++       to fix Undefined index: date in fullcalendar_views_pre_view() after 
++       patch 2185449-4.patch was applied
++       fix source is this patch on April 29, 2016
++       https://www.drupal.org/files/issues/ajax_date_format-2185449-17.patch
++       https://www.drupal.org/node/2148083
++      */
++      //$timestamp = (strtotime($exposed_input[$field_value_id]['min']['date']) + strtotime
++      $exposed = $exposed_input[$field_value_id];
++      $min = mktime(0, 0, 0, $exposed['min']['month'], $exposed['min']['day'],$exposed['min
++      $max = mktime(0, 0, 0, $exposed['max']['month'], $exposed['max']['day'],$exposed['max
++      $timestamp = ($min + $max) / 2;
++       // end patch 2185449-17
+       $min = date('Y-m', $timestamp);
+       $max = date('Y-m', strtotime($min . ' +1 month'));
+     }
